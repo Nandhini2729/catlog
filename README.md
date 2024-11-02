@@ -1,40 +1,62 @@
-import org.json.JSONObject;
-import org.json.JSONTokener;
-import java.io.FileReader;
-import java.math.BigInteger;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
-public class ShamirSecretSharing {
-
+public class PolynomialConstantFinder {
     public static void main(String[] args) {
+        String inputString = "{\"keys\": {\"n\": 4, \"k\": 3}, \"1\": {\"base\": \"10\", \"value\": \"4\"}, \"2\": {\"base\": \"2\", \"value\": \"111\"}, \"3\": {\"base\": \"10\", \"value\": \"12\"}, \"6\": {\"base\": \"4\", \"value\": \"213\"}}";
+
+        Map<Integer, Integer> points = extractPoints(inputString);
+        double constantTerm = findConstantTerm(points);
+        System.out.println("Constant term: " + constantTerm);
+    }
+
+    private static Map<Integer, Integer> extractPoints(String inputString) {
+        Map<Integer, Integer> points = new HashMap<>();
+
         try {
-            FileReader reader = new FileReader("input.json");
-            JSONTokener tokener = new JSONTokener(reader);
-            JSONObject jsonObject = new JSONObject(tokener);
-            JSONObject keys = jsonObject.getJSONObject("keys");
-            int n = keys.getInt("n");
-            int k = keys.getInt("k");
-            Map<Integer, BigInteger> points = new HashMap<>();
-            for (String key : jsonObject.keySet()) {
-                if (key.equals("keys")) continue;
-                int x = Integer.parseInt(key);
-                JSONObject pair = jsonObject.getJSONObject(key);
-                String base = pair.getString("base");
-                String value = pair.getString("value");
-                BigInteger y = new BigInteger(value, Integer.parseInt(base));
-                points.put(x, y);
+            // Remove JSON-like structure and split by commas
+            String[] parts = inputString.replaceAll("\\{|}|\"", "").split(",");
+
+            // Extract number of points (n) and minimum roots required (k)
+            int n = Integer.parseInt(parts[1].split(":")[1].trim());
+            int k = Integer.parseInt(parts[2].split(":")[1].trim());
+
+            // Iterate through parts to extract x, base (skip), and value
+            for (String part : parts) {
+                if (part.contains(":")) {
+                    String[] keyValue = part.split(":");
+                    if (keyValue.length >= 3) {
+                        int x = Integer.parseInt(keyValue[0].trim());
+                        // Skip base (it's not needed)
+                        int y = Integer.parseInt(keyValue[2].trim(), Integer.parseInt(keyValue[1].trim()));
+                        points.put(x, y);
+                    }
+                }
             }
-            
-            BigInteger constantTerm = findConstantTerm(points, k);
-            System.out.println("The secret constant term is: " + constantTerm);
-            
         } catch (Exception e) {
+            System.out.println("Error processing input string: " + e.getMessage());
             e.printStackTrace();
         }
+
+        return points;
     }
-    
-    public static BigInteger findConstantTerm(Map<Integer, BigInteger> points, int k) {
-        return BigInteger.ZERO;
-    }
-}
+
+    private static double findConstantTerm(Map<Integer, Integer> points) {
+        int n = points.size();
+        double constantTerm = 0;
+
+        // Convert points to arrays
+        Integer[] xValues = points.keySet().toArray(new Integer[0]);
+        Integer[] yValues = points.values().toArray(new Integer[0]);
+
+        // Compute the Lagrange polynomial and evaluate at x = 0
+        for (int i = 0; i < n; i++) {
+            double term = yValues[i];
+            for (int j = 0; j < n; j++) {
+                if (i != j) {
+                    term *= (0 - xValues[j]) / (double) (xValues[i] - xValues[j]);
+                }
+            }
+            constantTerm += term;
+        }
+
+        return constantTerm;
